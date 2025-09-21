@@ -253,8 +253,7 @@ namespace TTS1
 		{
 			text = System.Security.SecurityElement.Escape(text);
 
-			string prosodyAttrs = "";
-			
+		
 			// Note: Google handles rate and pitch differently in the audioConfig, 
 			// so we don't include them in SSML prosody tags
 			
@@ -285,5 +284,10 @@ namespace TTS1
                 _ => 0.0
             };
         }
+		public void Stop()
+		{
+			// Google TTS doesn't have built-in stop for the simple implementation
+			// You'd need to implement cancellation tokens for true async cancellation
+		}		
     }
 }

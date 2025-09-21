@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TTS1.WPF")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+14ae7bdb81ded5819183d749e999fc08f7a19a30")]
 [assembly: System.Reflection.AssemblyProductAttribute("TTS1.WPF")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TTS1.WPF")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -1,9 +1,9 @@
 C:\tts\tts1.wpf\obj\Debug\net8.0-windows\TTS1.WPF.csproj.AssemblyReference.cache
 C:\tts\tts1.wpf\obj\Debug\net8.0-windows\Controls\WaveformControl.baml
-C:\tts\tts1.wpf\obj\Debug\net8.0-windows\MainWindow.baml
+C:\tts\tts1.wpf\obj\Debug\net8.0-windows\Mainwindow.baml
 C:\tts\tts1.wpf\obj\Debug\net8.0-windows\App.baml
 C:\tts\tts1.wpf\obj\Debug\net8.0-windows\Controls\WaveformControl.g.cs
-C:\tts\tts1.wpf\obj\Debug\net8.0-windows\MainWindow.g.cs
+C:\tts\tts1.wpf\obj\Debug\net8.0-windows\Mainwindow.g.cs
 C:\tts\tts1.wpf\obj\Debug\net8.0-windows\App.g.cs
 C:\tts\tts1.wpf\obj\Debug\net8.0-windows\TTS1.WPF_MarkupCompile.cache
 C:\tts\tts1.wpf\obj\Debug\net8.0-windows\TTS1.WPF.g.resources
@@ -11,6 +11,7 @@ C:\tts\tts1.wpf\obj\Debug\net8.0-windows\TTS1.WPF.GeneratedMSBuildEditorConfig.e
 C:\tts\tts1.wpf\obj\Debug\net8.0-windows\TTS1.WPF.AssemblyInfoInputs.cache
 C:\tts\tts1.wpf\obj\Debug\net8.0-windows\TTS1.WPF.AssemblyInfo.cs
 C:\tts\tts1.wpf\obj\Debug\net8.0-windows\TTS1.WPF.csproj.CoreCompileInputs.cache
+C:\tts\tts1.wpf\obj\Debug\net8.0-windows\TTS1.WPF.sourcelink.json
 C:\tts\tts1.wpf\bin\Debug\net8.0-windows\libmp3lame.32.dll
 C:\tts\tts1.wpf\bin\Debug\net8.0-windows\libmp3lame.64.dll
 C:\tts\tts1.wpf\bin\Debug\net8.0-windows\TTS1.WPF.exe

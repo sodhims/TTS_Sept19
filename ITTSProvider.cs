@@ -15,6 +15,7 @@ namespace TTS1
         Task<bool> SpeakAsync(string text, SSMLSettings settings);
         Task<bool> SaveToWavAsync(string text, string filePath, SSMLSettings settings);
         Task<List<string>> SaveSplitToWavAsync(string text, string baseFilePath, SSMLSettings settings);
+		void Stop();
     }
 
     public class SSMLSettings

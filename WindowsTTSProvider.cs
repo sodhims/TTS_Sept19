@@ -86,53 +86,71 @@ namespace TTS1
             }
         }
 
-        public async Task<bool> SpeakAsync(string text, SSMLSettings settings)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    // Cancel any previous speech
-                    synth.SpeakAsyncCancelAll();
+		public async Task<bool> SpeakAsync(string text, SSMLSettings settings)
+		{
+			return await Task.Run(() =>
+			{
+				try
+				{
+					// Cancel any previous speech
+					synth.SpeakAsyncCancelAll();
 
-                    // Ensure we're using the correct voice
-                    if (!string.IsNullOrEmpty(currentVoice))
-                    {
-                        try
-                        {
-                            synth.SelectVoice(currentVoice);
-                        }
-                        catch
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Could not select voice: {currentVoice}");
-                        }
-                    }
+					// Ensure we're using the correct voice
+					if (!string.IsNullOrEmpty(currentVoice))
+					{
+						try
+						{
+							synth.SelectVoice(currentVoice);
+						}
+						catch
+						{
+							System.Diagnostics.Debug.WriteLine($"Could not select voice: {currentVoice}");
+						}
+					}
 
-                    synth.SetOutputToDefaultAudioDevice();
+					synth.SetOutputToDefaultAudioDevice();
 
-                    if (settings.UseSSML)
-                    {
-                        var ssml = BuildSSMLForText(text, settings);
-                        // Use synchronous speak to avoid issues
-                        synth.SpeakSsml(ssml);
-                    }
-                    else
-                    {
-                        // Apply settings even without SSML
-                        synth.Rate = Math.Max(-10, Math.Min(10, settings.RatePercent / 10)); // Clamp to valid range
-                        synth.Volume = GetVolumeValue(settings.VolumeLevel);
-                        synth.Speak(text);
-                    }
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"SpeakAsync error: {ex.Message}");
-                    return false;
-                }
-            });
-        }
-
+					if (settings.UseSSML)
+					{
+						var ssml = BuildSSMLForText(text, settings);
+						// Use SpeakSsmlAsync for cancellable speech
+						var prompt = synth.SpeakSsmlAsync(ssml);
+						
+						// Wait for completion
+						while (!prompt.IsCompleted)
+						{
+							System.Threading.Thread.Sleep(100);
+						}
+						
+						// If it completed, we assume success (unless it was cancelled by Stop())
+						return prompt.IsCompleted;
+					}
+					else
+					{
+						// Apply settings even without SSML
+						synth.Rate = Math.Max(-10, Math.Min(10, settings.RatePercent / 10));
+						synth.Volume = GetVolumeValue(settings.VolumeLevel);
+						
+						// Use SpeakAsync for cancellable speech
+						var prompt = synth.SpeakAsync(text);
+						
+						// Wait for completion
+						while (!prompt.IsCompleted)
+						{
+							System.Threading.Thread.Sleep(100);
+						}
+						
+						// If it completed, we assume success
+						return prompt.IsCompleted;
+					}
+				}
+				catch (Exception ex)
+				{
+					System.Diagnostics.Debug.WriteLine($"SpeakAsync error: {ex.Message}");
+					return false;
+				}
+			});
+		}
         public async Task<bool> SaveToWavAsync(string text, string filePath, SSMLSettings settings)
         {
             return await Task.Run(() =>
@@ -194,6 +212,11 @@ namespace TTS1
             }
 
             return createdFiles;
+        }
+
+        public void Stop()
+        {
+            synth.SpeakAsyncCancelAll();
         }
 
         private List<string> SplitTextByTag(string text)

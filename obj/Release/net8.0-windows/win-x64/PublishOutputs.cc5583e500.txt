@@ -1,9 +1,0 @@
-C:\tts\published\TTS1.WPF.pdb
-C:\tts\published\libmp3lame.32.dll
-C:\tts\published\libmp3lame.64.dll
-C:\tts\published\D3DCompiler_47_cor3.dll
-C:\tts\published\PenImc_cor3.dll
-C:\tts\published\PresentationNative_cor3.dll
-C:\tts\published\vcruntime140_cor3.dll
-C:\tts\published\wpfgfx_cor3.dll
-C:\tts\published\TTS1.WPF.exe

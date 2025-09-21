@@ -1,0 +1,121 @@
+<!-- Sample1_Basic.ssml - Basic SSML with prosody -->
+<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
+  <prosody rate="medium" pitch="+2st">
+    Welcome to the TTS Multi-Provider application.
+  </prosody>
+  <break time="500ms"/>
+  <prosody rate="slow" pitch="-2st">
+    This is a sample SSML file demonstrating different speech properties.
+  </prosody>
+  <break time="1s"/>
+  <emphasis level="strong">
+    You can control rate, pitch, volume, and emphasis!
+  </emphasis>
+</speak>
+
+<!-- Sample2_MultiVoice.ssml - Multi-voice dialogue -->
+<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
+  <voice name="Microsoft David Desktop">
+    <prosody rate="medium">
+      Hello, I'm David. I'll be your narrator today.
+    </prosody>
+  </voice>
+  <break time="500ms"/>
+  <voice name="Microsoft Zira Desktop">
+    <prosody rate="110%" pitch="+3st">
+      And I'm Zira! I'm here to demonstrate multi-voice capability.
+    </prosody>
+  </voice>
+  <break time="500ms"/>
+  <voice name="Microsoft David Desktop">
+    <prosody rate="medium">
+      Together, we can create engaging audio content with different characters.
+    </prosody>
+  </voice>
+</speak>
+
+<!-- Sample3_Story.ssml - Story with narrator and characters -->
+<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
+  <voice name="Microsoft David Desktop">
+    <prosody rate="medium" volume="medium">
+      Once upon a time, in a digital kingdom, there lived three voices.
+    </prosody>
+    <break time="700ms"/>
+    <prosody rate="slow" volume="soft">
+      The first voice spoke quietly and slowly...
+    </prosody>
+  </voice>
+  <break time="500ms"/>
+  
+  <voice name="Microsoft Zira Desktop">
+    <prosody rate="fast" pitch="+5st" volume="loud">
+      The second voice was energetic and high-pitched!
+    </prosody>
+  </voice>
+  <break time="500ms"/>
+  
+  <voice name="Microsoft Mark Desktop">
+    <prosody rate="medium" pitch="-5st" volume="medium">
+      And the third voice was deep and measured.
+    </prosody>
+  </voice>
+  <break time="700ms"/>
+  
+  <voice name="Microsoft David Desktop">
+    <prosody rate="medium">
+      Together, they created wonderful stories that came to life through sound.
+    </prosody>
+  </voice>
+</speak>
+
+<!-- Sample4_GoogleTTS.ssml - Google TTS compatible SSML -->
+<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
+  <voice name="en-US-Wavenet-D">
+    <prosody rate="medium">
+      This SSML is optimized for Google Cloud Text-to-Speech.
+    </prosody>
+    <break time="500ms"/>
+    <emphasis level="moderate">
+      Google voices support Wavenet and Neural2 technologies.
+    </emphasis>
+  </voice>
+  <break time="300ms"/>
+  <voice name="en-US-Wavenet-A">
+    <prosody rate="110%">
+      Each voice has unique characteristics and quality.
+    </prosody>
+  </voice>
+</speak>
+
+<!-- Sample5_Complex.ssml - Complex SSML with all features -->
+<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
+  <voice name="Microsoft David Desktop">
+    <prosody rate="slow" pitch="low" volume="soft">
+      <emphasis level="reduced">
+        (Whispering) Let me tell you a secret...
+      </emphasis>
+    </prosody>
+    <break time="1s"/>
+    
+    <prosody rate="medium" pitch="medium" volume="medium">
+      This application can do amazing things with text-to-speech!
+    </prosody>
+    <break time="500ms"/>
+    
+    <prosody rate="150%" pitch="+10st" volume="loud">
+      <emphasis level="strong">
+        IT CAN SHOUT WITH EXCITEMENT!
+      </emphasis>
+    </prosody>
+    <break time="700ms"/>
+    
+    <prosody rate="80%" pitch="-5st" volume="medium">
+      Or speak slowly and deeply for dramatic effect...
+    </prosody>
+    <break time="2s"/>
+    
+    <prosody rate="medium" pitch="medium" volume="medium">
+      The possibilities are endless!
+    </prosody>
+  </voice>
+</speak>

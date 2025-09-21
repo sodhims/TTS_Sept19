@@ -106,7 +106,7 @@
                     
                     <!-- Buttons -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Content="▶ Play" Click="PlaySegment_Click" Margin="5" Padding="10,5" Background="LightGreen"/>
+                        <Button Content="Play" Click="PlaySegment_Click" Margin="5" Padding="10,5" Background="LightGreen"/>
                         <Button Content="Apply" Click="ApplySegmentSettings_Click" Margin="5" Padding="10,5"/>
                         <Button Content="Delete Marker" Click="DeleteMarker_Click" Margin="5" Padding="10,5"/>
                         <Button Content="Cancel" Click="CancelSegmentEdit_Click" Margin="5" Padding="10,5"/>
