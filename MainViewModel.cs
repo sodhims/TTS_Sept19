@@ -25,21 +25,36 @@ namespace TTS1.WPF
 
         // Properties
         private int _selectedProviderIndex = 0;
-        public int SelectedProviderIndex
-        {
-            get => _selectedProviderIndex;
-            set
-            {
-                if (_selectedProviderIndex != value)
-                {
-                    _selectedProviderIndex = value;
-                    OnPropertyChanged();
-                    OnPropertyChanged(nameof(IsGoogleProviderSelected));
-                    OnProviderChanged();
-                }
-            }
-        }
-
+		public int SelectedProviderIndex
+		{
+			get => _selectedProviderIndex;
+			set
+			{
+				if (_selectedProviderIndex != value)
+				{
+					_selectedProviderIndex = value;
+					OnPropertyChanged();
+					OnPropertyChanged(nameof(IsGoogleProviderSelected));
+					
+					// Update the current provider name
+					CurrentProviderName = value == 0 ? "Windows SAPI" : "Google Cloud TTS";
+					
+					OnProviderChanged();
+				}
+			}
+		}		private string _currentProviderName = "Windows SAPI";
+		public string CurrentProviderName
+		{
+			get => _currentProviderName;
+			set
+			{
+				if (_currentProviderName != value)
+				{
+					_currentProviderName = value;
+					OnPropertyChanged();
+				}
+			}
+}
         public bool IsGoogleProviderSelected => SelectedProviderIndex == 1;
 
         private string _googleApiKey;
@@ -352,24 +367,50 @@ namespace TTS1.WPF
 		{
 			if (currentProvider == null || WaveformSegments == null) return;
 
-			// Split the input text by <split> tags
 			var parts = System.Text.RegularExpressions.Regex.Split(InputText ?? "", @"<\s*split\s*/?\s*>");
+			string originalVoice = SelectedVoice;
 			
-			for (int i = 0; i < WaveformSegments.Count && i < parts.Length; i++)
+			try
 			{
-				var segment = WaveformSegments[i];
-				var text = parts[i].Trim();
+				for (int i = 0; i < WaveformSegments.Count && i < parts.Length; i++)
+				{
+					var segment = WaveformSegments[i];
+					var text = parts[i].Trim();
+					
+					if (string.IsNullOrEmpty(text)) continue;
+					
+					// Notify UI that this segment is playing
+					StatusText = $"Playing segment {i + 1} of {WaveformSegments.Count}";
+					
+					// Set voice for this segment
+					if (!string.IsNullOrEmpty(segment.VoiceName) && AvailableVoices.Contains(segment.VoiceName))
+					{
+						currentProvider.SetVoice(segment.VoiceName);
+						SelectedVoice = segment.VoiceName;
+					}
+					
+					var settings = segment.Settings ?? GetCurrentSettings();
+					
+					// Speak this segment
+					bool success = await currentProvider.SpeakAsync(text, settings);
+					
+					if (!success)
+					{
+						System.Diagnostics.Debug.WriteLine($"Failed to speak segment {i}");
+						break;
+					}
+				}
+			}
+			finally
+			{
+				// Restore original voice
+				if (!string.IsNullOrEmpty(originalVoice))
+				{
+					currentProvider.SetVoice(originalVoice);
+					SelectedVoice = originalVoice;
+				}
 				
-				if (string.IsNullOrEmpty(text)) continue;
-				
-				// Set voice for this segment
-				currentProvider.SetVoice(segment.VoiceName);
-				
-				// Use segment's settings or default settings
-				var settings = segment.Settings ?? GetCurrentSettings();
-				
-				// Speak this segment
-				await currentProvider.SpeakAsync(text, settings);
+				StatusText = "Ready";
 			}
 		}
 		// Generate multi-voice audio file
@@ -380,6 +421,9 @@ namespace TTS1.WPF
 
 			try
 			{
+				// Store original voice
+				string originalVoice = SelectedVoice;
+				
 				// Split the input text by <split> tags
 				var parts = System.Text.RegularExpressions.Regex.Split(InputText ?? "", @"<\s*split\s*/?\s*>");
 				var tempFiles = new List<string>();
@@ -394,8 +438,17 @@ namespace TTS1.WPF
 					
 					string tempFile = Path.GetTempFileName() + ".wav";
 					
-					// Set voice for this segment
-					currentProvider.SetVoice(segment.VoiceName);
+					System.Diagnostics.Debug.WriteLine($"Generating segment {i}: Voice={segment.VoiceName}");
+					
+					// Set voice for this segment - validate it exists
+					if (!string.IsNullOrEmpty(segment.VoiceName) && AvailableVoices.Contains(segment.VoiceName))
+					{
+						currentProvider.SetVoice(segment.VoiceName);
+					}
+					else
+					{
+						System.Diagnostics.Debug.WriteLine($"Voice '{segment.VoiceName}' not found, using current voice");
+					}
 					
 					// Use segment's settings
 					var settings = segment.Settings ?? GetCurrentSettings();
@@ -407,6 +460,12 @@ namespace TTS1.WPF
 					{
 						tempFiles.Add(tempFile);
 					}
+				}
+				
+				// Restore original voice
+				if (!string.IsNullOrEmpty(originalVoice))
+				{
+					currentProvider.SetVoice(originalVoice);
 				}
 				
 				// Combine all WAV files into one
@@ -430,7 +489,6 @@ namespace TTS1.WPF
 			
 			return false;
 		}
-
 		// Helper method to combine multiple WAV files
 		private async Task<bool> CombineWavFiles(List<string> inputFiles, string outputFile)
 		{
@@ -551,88 +609,143 @@ namespace TTS1.WPF
 			var splitPattern = @"<\s*split\s*/?\s*>";
 			var chunks = Regex.Split(InputText, splitPattern);
 			
-			// Check if we have segments defined
+			// Build SSML with markers at split points
+			var ssml = new StringBuilder();
+			ssml.AppendLine("<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\">");
+			
+			// Check if we have segments defined for multi-voice
 			if (WaveformSegments != null && WaveformSegments.Count > 0)
 			{
-				// Build multi-voice SSML preview
-				var ssml = new StringBuilder();
-				ssml.AppendLine("<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\">");
-				
-				for (int i = 0; i < WaveformSegments.Count && i < chunks.Length; i++)
+				// Multi-voice SSML with segment markers
+				for (int i = 0; i < chunks.Length; i++)
 				{
-					var segment = WaveformSegments[i];
 					var text = chunks[i].Trim();
-					
 					if (string.IsNullOrEmpty(text)) continue;
 					
-					var segSettings = segment.Settings ?? settings;
+					// Insert marker at the beginning of each segment
+					ssml.AppendLine($"  <mark name=\"segment_{i}_start\"/>");
 					
-					ssml.AppendLine($"  <voice name=\"{segment.VoiceName}\">");
-					
-					int rate = 100 + segSettings.RatePercent;
-					string pitch = segSettings.PitchSemitones >= 0 ? 
-						$"+{segSettings.PitchSemitones}st" : 
-						$"{segSettings.PitchSemitones}st";
-					
-					ssml.AppendLine($"    <prosody rate=\"{rate}%\" pitch=\"{pitch}\" volume=\"{segSettings.VolumeLevel}\">");
-					
-					if (segSettings.EmphasisLevel != "none")
+					// Get the corresponding segment if it exists
+					if (i < WaveformSegments.Count)
 					{
-						ssml.AppendLine($"      <emphasis level=\"{segSettings.EmphasisLevel}\">");
-						ssml.AppendLine($"        {System.Security.SecurityElement.Escape(text)}");
-						ssml.AppendLine($"      </emphasis>");
+						var segment = WaveformSegments[i];
+						var segSettings = segment.Settings ?? settings;
+						
+						// Add comment for clarity in preview
+						ssml.AppendLine($"  <!-- Segment {i + 1}: Voice = {segment.VoiceName} -->");
+						
+						// Voice wrapper
+						ssml.AppendLine($"  <voice name=\"{segment.VoiceName}\">");
+						
+						// Prosody settings
+						int rate = 100 + segSettings.RatePercent;
+						string pitch = segSettings.PitchSemitones >= 0 ? 
+							$"+{segSettings.PitchSemitones}st" : 
+							$"{segSettings.PitchSemitones}st";
+						
+						ssml.AppendLine($"    <prosody rate=\"{rate}%\" pitch=\"{pitch}\" volume=\"{segSettings.VolumeLevel}\">");
+						
+						// Emphasis if needed
+						if (segSettings.EmphasisLevel != "none" && !string.IsNullOrEmpty(segSettings.EmphasisLevel))
+						{
+							ssml.AppendLine($"      <emphasis level=\"{segSettings.EmphasisLevel}\">");
+							ssml.AppendLine($"        {System.Security.SecurityElement.Escape(text)}");
+							ssml.AppendLine($"      </emphasis>");
+						}
+						else
+						{
+							ssml.AppendLine($"      {System.Security.SecurityElement.Escape(text)}");
+						}
+						
+						ssml.AppendLine("    </prosody>");
+						
+						// Break if specified
+						if (segSettings.BreakMs > 0)
+						{
+							ssml.AppendLine($"    <break time=\"{segSettings.BreakMs}ms\"/>");
+						}
+						
+						ssml.AppendLine("  </voice>");
 					}
 					else
 					{
-						ssml.AppendLine($"      {System.Security.SecurityElement.Escape(text)}");
+						// No segment defined for this text chunk, use default voice
+						ssml.AppendLine($"  <!-- Segment {i + 1}: Using default voice -->");
+						
+						int rate = 100 + settings.RatePercent;
+						string pitch = settings.PitchSemitones >= 0 ? 
+							$"+{settings.PitchSemitones}st" : 
+							$"{settings.PitchSemitones}st";
+						
+						ssml.AppendLine($"  <prosody rate=\"{rate}%\" pitch=\"{pitch}\" volume=\"{settings.VolumeLevel}\">");
+						
+						if (settings.EmphasisLevel != "none" && !string.IsNullOrEmpty(settings.EmphasisLevel))
+						{
+							ssml.AppendLine($"    <emphasis level=\"{settings.EmphasisLevel}\">");
+							ssml.AppendLine($"      {System.Security.SecurityElement.Escape(text)}");
+							ssml.AppendLine($"    </emphasis>");
+						}
+						else
+						{
+							ssml.AppendLine($"    {System.Security.SecurityElement.Escape(text)}");
+						}
+						
+						ssml.AppendLine("  </prosody>");
+						
+						if (settings.BreakMs > 0)
+						{
+							ssml.AppendLine($"  <break time=\"{settings.BreakMs}ms\"/>");
+						}
 					}
 					
-					ssml.AppendLine("    </prosody>");
-					
-					if (segSettings.BreakMs > 0)
-						ssml.AppendLine($"    <break time=\"{segSettings.BreakMs}ms\"/>");
-					
-					ssml.AppendLine("  </voice>");
+					// Insert end marker for this segment
+					ssml.AppendLine($"  <mark name=\"segment_{i}_end\"/>");
 				}
-				
-				ssml.Append("</speak>");
-				SSMLPreview = ssml.ToString();
 			}
 			else
 			{
-				// Original single-voice SSML
-				string firstChunk = chunks.Length > 0 ? chunks[0].Trim() : "Sample text";
-				if (string.IsNullOrEmpty(firstChunk))
-					firstChunk = "Sample text";
-
-				var ssml = "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\">\n";
-
-				int rate = 100 + settings.RatePercent;
-				string pitch = settings.PitchSemitones >= 0 ? 
-					$"+{settings.PitchSemitones}st" : 
-					$"{settings.PitchSemitones}st";
-
-				ssml += $"  <prosody rate=\"{rate}%\" pitch=\"{pitch}\" volume=\"{settings.VolumeLevel}\">\n";
-
-				if (settings.EmphasisLevel != "none")
+				// Single-voice SSML with markers at split points
+				for (int i = 0; i < chunks.Length; i++)
 				{
-					ssml += $"    <emphasis level=\"{settings.EmphasisLevel}\">\n";
-					ssml += $"      {System.Security.SecurityElement.Escape(firstChunk)}\n";
-					ssml += $"    </emphasis>\n";
+					var text = chunks[i].Trim();
+					if (string.IsNullOrEmpty(text)) continue;
+					
+					// Insert marker before each chunk (except the first)
+					if (i > 0)
+					{
+						ssml.AppendLine($"  <mark name=\"split_{i}\"/>");
+					}
+					
+					int rate = 100 + settings.RatePercent;
+					string pitch = settings.PitchSemitones >= 0 ? 
+						$"+{settings.PitchSemitones}st" : 
+						$"{settings.PitchSemitones}st";
+					
+					ssml.AppendLine($"  <prosody rate=\"{rate}%\" pitch=\"{pitch}\" volume=\"{settings.VolumeLevel}\">");
+					
+					if (settings.EmphasisLevel != "none" && !string.IsNullOrEmpty(settings.EmphasisLevel))
+					{
+						ssml.AppendLine($"    <emphasis level=\"{settings.EmphasisLevel}\">");
+						ssml.AppendLine($"      {System.Security.SecurityElement.Escape(text)}");
+						ssml.AppendLine($"    </emphasis>");
+					}
+					else
+					{
+						ssml.AppendLine($"    {System.Security.SecurityElement.Escape(text)}");
+					}
+					
+					ssml.AppendLine("  </prosody>");
+					
+					// Add break between segments
+					if (settings.BreakMs > 0 && i < chunks.Length - 1)
+					{
+						ssml.AppendLine($"  <break time=\"{settings.BreakMs}ms\"/>");
+					}
 				}
-				else
-				{
-					ssml += $"    {System.Security.SecurityElement.Escape(firstChunk)}\n";
-				}
-
-				ssml += "  </prosody>\n";
-
-				if (settings.BreakMs > 0)
-					ssml += $"  <break time=\"{settings.BreakMs}ms\"/>\n";
-
-				ssml += "</speak>";
-				SSMLPreview = ssml;
 			}
+			
+			ssml.Append("</speak>");
+			SSMLPreview = ssml.ToString();
 		}
 		public event PropertyChangedEventHandler PropertyChanged;
 

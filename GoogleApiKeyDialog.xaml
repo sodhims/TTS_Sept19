@@ -1,0 +1,111 @@
+<Window x:Class="TTS1.WPF.Dialogs.GoogleApiKeyDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Google Cloud TTS Configuration" 
+        Height="280" 
+        Width="500"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize">
+    
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Title -->
+        <TextBlock Grid.Row="0" 
+                   Text="Google Cloud Text-to-Speech API Key" 
+                   FontSize="16" 
+                   FontWeight="Bold"
+                   Margin="0,0,0,15"/>
+        
+        <!-- Instructions -->
+        <TextBlock Grid.Row="1" 
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,10">
+            <Run>Enter your Google Cloud API key to use Google TTS voices.</Run>
+            <LineBreak/>
+            <Run FontSize="11" Foreground="Gray">You can get an API key from the Google Cloud Console.</Run>
+        </TextBlock>
+        
+        <!-- API Key Input -->
+        <Grid Grid.Row="2" Margin="0,10,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="80"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="80"/>
+            </Grid.ColumnDefinitions>
+            
+            <Label Grid.Column="0" Content="API Key:" VerticalAlignment="Center"/>
+            <PasswordBox Grid.Column="1" 
+                        x:Name="txtApiKey" 
+                        VerticalAlignment="Center"
+                        Padding="5"
+                        PasswordChar="●"/>
+            <CheckBox Grid.Column="2" 
+                     x:Name="chkShowKey" 
+                     Content="Show" 
+                     VerticalAlignment="Center"
+                     Margin="10,0,0,0"
+                     Checked="chkShowKey_Checked"
+                     Unchecked="chkShowKey_Unchecked"/>
+        </Grid>
+        
+        <!-- Alternative visible textbox for when Show is checked -->
+        <Grid Grid.Row="3" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="80"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            
+            <TextBox Grid.Column="1" 
+                    x:Name="txtApiKeyVisible" 
+                    Visibility="Collapsed"
+                    VerticalAlignment="Center"
+                    Padding="5"/>
+        </Grid>
+        
+        <!-- Help Link -->
+        <TextBlock Grid.Row="4" VerticalAlignment="Top" Margin="0,10,0,0">
+            <Hyperlink NavigateUri="https://cloud.google.com/text-to-speech/docs/quickstart" 
+                      RequestNavigate="Hyperlink_RequestNavigate">
+                <Run Text="How to get a Google Cloud API key" FontSize="11"/>
+            </Hyperlink>
+        </TextBlock>
+        
+        <!-- Buttons -->
+        <StackPanel Grid.Row="5" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right"
+                    Margin="0,20,0,0">
+            <Button x:Name="btnTest" 
+                    Content="Test Connection" 
+                    Width="110" 
+                    Margin="0,0,10,0"
+                    Padding="8,5"
+                    Click="btnTest_Click"/>
+            <Button x:Name="btnOK" 
+                    Content="OK" 
+                    Width="80" 
+                    IsDefault="True"
+                    Margin="0,0,10,0"
+                    Padding="8,5"
+                    Click="btnOK_Click"/>
+            <Button x:Name="btnCancel" 
+                    Content="Cancel" 
+                    Width="80" 
+                    IsCancel="True"
+                    Padding="8,5"
+                    Click="btnCancel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

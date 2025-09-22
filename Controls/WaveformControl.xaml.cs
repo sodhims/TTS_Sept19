@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using NAudio.Wave;
+using System.Threading;
 using System.Threading.Tasks;
 using TTS1; // For SSMLSettings
 
@@ -19,6 +20,7 @@ namespace TTS1.WPF.Controls
         public ObservableCollection<WaveformMarker> Markers { get; set; }
         public ObservableCollection<WaveformSegment> Segments { get; set; }
         public List<string> AvailableVoices { get; set; }
+        public Func<string, Task<bool>> SpeakAsyncDelegate { get; set; }
         
         private float[] audioSamples;
         private double audioDuration = 10.0; // Default 10 seconds
@@ -27,11 +29,25 @@ namespace TTS1.WPF.Controls
         private WaveformSegment selectedSegment;
         private Rectangle selectedSegmentRectangle;
         private Dictionary<WaveformSegment, Rectangle> segmentRectangles;
-		private MainViewModel viewModel;
-		public void SetViewModel(MainViewModel vm)
-		{
-			viewModel = vm;
-		}
+        private MainViewModel viewModel;
+        
+        // Playback tracking
+        private Rectangle playbackProgressBar;
+        private Rectangle currentPlayingSegment;
+        private System.Windows.Threading.DispatcherTimer playbackTimer;
+        private DateTime playbackStartTime;
+        private int currentPlayingSegmentIndex = -1;
+        private double playbackPosition = 0;
+        private bool ignoreSegmentEndDuringPlayback = false;
+        
+        // Store the original text for segment extraction
+        private string originalText;
+        
+        public void SetViewModel(MainViewModel vm)
+        {
+            viewModel = vm;
+        }
+        
         // Color palette for segments
         private readonly Color[] segmentColors = new[]
         {
@@ -92,54 +108,11 @@ namespace TTS1.WPF.Controls
             WaveformCanvas.Children.Add(text);
         }
 
-        // Load and display audio file
-        public void LoadAudioFile(string filePath)
-        {
-            try
-            {
-                using (var reader = new AudioFileReader(filePath))
-                {
-                    sampleRate = reader.WaveFormat.SampleRate;
-                    audioDuration = reader.TotalTime.TotalSeconds;
-                    
-                    // Define canvasWidth here before using it
-                    double canvasWidth = WaveformCanvas.ActualWidth > 0 ? WaveformCanvas.ActualWidth : 800;
-                    
-                    // Read samples (downsample for display)
-                    var sampleProvider = reader.ToSampleProvider();
-                    int targetSamples = (int)(canvasWidth * 2); // Now canvasWidth is defined
-                    int totalSamples = (int)(reader.Length / (reader.WaveFormat.BitsPerSample / 8));
-                    int skipFactor = Math.Max(1, totalSamples / targetSamples);
-                    
-                    var samples = new List<float>();
-                    var buffer = new float[skipFactor];
-                    
-                    while (sampleProvider.Read(buffer, 0, buffer.Length) > 0)
-                    {
-                        samples.Add(buffer.Max(Math.Abs));
-                    }
-                    
-                    audioSamples = samples.ToArray();
-                    DrawWaveform();
-                    DrawTimeline();
-                    
-                    // Auto-add initial and final markers
-                    if (Markers.Count == 0)
-                    {
-                        AddMarker(0);
-                        AddMarker(audioDuration);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error loading audio: {ex.Message}");
-            }
-        }
-
         // Generate synthetic waveform from text length
         public void GenerateSyntheticWaveform(string text, double estimatedDuration = 10.0)
         {
+            // Store the original text for later segment extraction
+            originalText = text;
             audioDuration = estimatedDuration;
             
             // Generate fake waveform data based on text
@@ -291,8 +264,14 @@ namespace TTS1.WPF.Controls
             Markers.Add(marker);
         }
 
+        // Public method to get the currently selected segment
+        public WaveformSegment GetSelectedSegment()
+        {
+            return selectedSegment;
+        }
+
         // Update entire display
-        private void UpdateDisplay()
+        public void UpdateDisplay()
         {
             RedrawMarkers();
             RecalculateSegments();
@@ -325,7 +304,7 @@ namespace TTS1.WPF.Controls
             }
         }
 
-        // Recalculate segments
+        // Recalculate segments and extract text for each segment
         private void RecalculateSegments()
         {
             Segments.Clear();
@@ -338,6 +317,14 @@ namespace TTS1.WPF.Controls
             
             var sortedMarkers = Markers.OrderBy(m => m.TimeSeconds).ToList();
             if (sortedMarkers.Count < 2) return;
+            
+            // Extract text parts from the original text if available
+            List<string> textParts = new List<string>();
+            if (!string.IsNullOrEmpty(originalText))
+            {
+                var parts = System.Text.RegularExpressions.Regex.Split(originalText, @"<\s*split\s*/?\s*>");
+                textParts = parts.Select(p => p.Trim()).Where(p => !string.IsNullOrEmpty(p)).ToList();
+            }
             
             double width = OverlayCanvas.ActualWidth > 0 ? OverlayCanvas.ActualWidth : 800;
             double height = OverlayCanvas.ActualHeight > 0 ? OverlayCanvas.ActualHeight : 150;
@@ -358,7 +345,8 @@ namespace TTS1.WPF.Controls
                 {
                     StartTime = sortedMarkers[i].TimeSeconds,
                     EndTime = sortedMarkers[i + 1].TimeSeconds,
-                    VoiceName = sortedMarkers[i].VoiceName, // Use the START marker's voice
+                    VoiceName = sortedMarkers[i].VoiceName,
+                    Text = i < textParts.Count ? textParts[i] : "", // Assign text from split parts
                     Settings = new SSMLSettings
                     {
                         RatePercent = sortedMarkers[i].RatePercent,
@@ -401,11 +389,12 @@ namespace TTS1.WPF.Controls
             }
             
             UpdateLabels();
-			    // Notify MainViewModel of segment changes
-			if (viewModel != null)
-			{
-				viewModel.WaveformSegments = Segments.ToList();
-			}
+            
+            // Notify MainViewModel of segment changes
+            if (viewModel != null)
+            {
+                viewModel.WaveformSegments = Segments.ToList();
+            }
         }
 
         // Update voice labels
@@ -453,39 +442,35 @@ namespace TTS1.WPF.Controls
             }
         }
 
-		private void SelectSegmentAtTime(double time)
-		{
-			// Clear previous selection visually
-			if (selectedSegmentRectangle != null)
-			{
-				selectedSegmentRectangle.Opacity = 0.3; // Reset to default opacity
-				selectedSegmentRectangle = null;
-			}
-			
-			// Find segment at this time
-			selectedSegment = Segments.FirstOrDefault(s => time >= s.StartTime && time <= s.EndTime);
-			
-			if (selectedSegment != null)
-			{
-				// Find the rectangle for this segment
-				if (segmentRectangles.TryGetValue(selectedSegment, out Rectangle rect))
-				{
-					selectedSegmentRectangle = rect;
-					selectedSegmentRectangle.Opacity = 0.6; // Highlight selected segment
-					UpdateSegmentInfo($"Selected: {selectedSegment.StartTime:F1}s - {selectedSegment.EndTime:F1}s | Voice: {selectedSegment.VoiceName}");
-				}
-				else
-				{
-					UpdateSegmentInfo($"Selected segment but no visual found");
-				}
-			}
-			else
-			{
-				selectedSegment = null;
-				selectedSegmentRectangle = null;
-				UpdateSegmentInfo("Click on a segment to select");
-			}
-		}
+        private void SelectSegmentAtTime(double time)
+        {
+            // Clear previous selection visually
+            if (selectedSegmentRectangle != null)
+            {
+                selectedSegmentRectangle.Opacity = 0.3; // Reset to default opacity
+                selectedSegmentRectangle = null;
+            }
+            
+            // Find segment at this time
+            selectedSegment = Segments.FirstOrDefault(s => time >= s.StartTime && time <= s.EndTime);
+            
+            if (selectedSegment != null)
+            {
+                // Find the rectangle for this segment
+                if (segmentRectangles.TryGetValue(selectedSegment, out Rectangle rect))
+                {
+                    selectedSegmentRectangle = rect;
+                    selectedSegmentRectangle.Opacity = 0.6; // Highlight selected segment
+                    UpdateSegmentInfo($"Selected: {selectedSegment.StartTime:F1}s - {selectedSegment.EndTime:F1}s | Voice: {selectedSegment.VoiceName}");
+                }
+            }
+            else
+            {
+                selectedSegment = null;
+                selectedSegmentRectangle = null;
+                UpdateSegmentInfo("Click on a segment to select");
+            }
+        }
 
         private void OverlayCanvas_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
@@ -526,31 +511,28 @@ namespace TTS1.WPF.Controls
             e.Handled = true;
         }
 
-		// Also update the mouse enter/leave to not interfere with selection
-		private void Segment_MouseEnter(object sender, MouseEventArgs e)
-		{
-			var rect = sender as Rectangle;
-			var segment = rect.Tag as WaveformSegment;
-			
-			if (segment != null && segment != selectedSegment)
-			{
-				// Only show hover info if it's not the selected segment
-				UpdateSegmentInfo($"Hover: {segment.StartTime:F1}s - {segment.EndTime:F1}s | Voice: {segment.VoiceName}");
-			}
-		}
-		private void Segment_MouseLeave(object sender, MouseEventArgs e)
-		{
-			// Restore selected segment info if one is selected
-			if (selectedSegment != null)
-			{
-				UpdateSegmentInfo($"Selected: {selectedSegment.StartTime:F1}s - {selectedSegment.EndTime:F1}s | Voice: {selectedSegment.VoiceName}");
-			}
-			else
-			{
-				UpdateSegmentInfo("Click on a segment to select");
-			}
-		}
+        private void Segment_MouseEnter(object sender, MouseEventArgs e)
+        {
+            var rect = sender as Rectangle;
+            var segment = rect.Tag as WaveformSegment;
+            
+            if (segment != null && segment != selectedSegment)
+            {
+                UpdateSegmentInfo($"Hover: {segment.StartTime:F1}s - {segment.EndTime:F1}s | Voice: {segment.VoiceName}");
+            }
+        }
 
+        private void Segment_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (selectedSegment != null)
+            {
+                UpdateSegmentInfo($"Selected: {selectedSegment.StartTime:F1}s - {selectedSegment.EndTime:F1}s | Voice: {selectedSegment.VoiceName}");
+            }
+            else
+            {
+                UpdateSegmentInfo("Click on a segment to select");
+            }
+        }
 
         // Popup button handlers
         private void ApplySegmentSettings_Click(object sender, RoutedEventArgs e)
@@ -571,29 +553,28 @@ namespace TTS1.WPF.Controls
                 currentEditingSegment.Settings.VolumeLevel = (PopupVolumeCombo.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "medium";
                 currentEditingSegment.Settings.EmphasisLevel = (PopupEmphasisCombo.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "none";
                 
-                // Update the corresponding START marker to have this voice
-                var startMarker = Markers.FirstOrDefault(m => Math.Abs(m.TimeSeconds - currentEditingSegment.StartTime) < 0.01);
-                if (startMarker != null)
+                // Update the corresponding marker
+                var sortedMarkers = Markers.OrderBy(m => m.TimeSeconds).ToList();
+                int segmentIndex = Segments.IndexOf(currentEditingSegment);
+                
+                if (segmentIndex >= 0 && segmentIndex < sortedMarkers.Count)
                 {
-                    startMarker.VoiceName = newVoiceName;
-                    startMarker.RatePercent = currentEditingSegment.Settings.RatePercent;
-                    startMarker.PitchSemitones = currentEditingSegment.Settings.PitchSemitones;
-                    startMarker.VolumeLevel = currentEditingSegment.Settings.VolumeLevel;
-                    startMarker.EmphasisLevel = currentEditingSegment.Settings.EmphasisLevel;
-                    startMarker.BreakMs = currentEditingSegment.Settings.BreakMs;
+                    var marker = sortedMarkers[segmentIndex];
+                    marker.VoiceName = newVoiceName;
+                    marker.RatePercent = currentEditingSegment.Settings.RatePercent;
+                    marker.PitchSemitones = currentEditingSegment.Settings.PitchSemitones;
+                    marker.VolumeLevel = currentEditingSegment.Settings.VolumeLevel;
+                    marker.EmphasisLevel = currentEditingSegment.Settings.EmphasisLevel;
+                    marker.BreakMs = currentEditingSegment.Settings.BreakMs;
                 }
                 
-                // Update visual representation
-                UpdateLabels();
-                RedrawSegmentColors();
-                UpdateSegmentInfo($"Applied voice '{newVoiceName}' to segment");
-				    UpdateSegmentInfo($"Applied voice '{newVoiceName}' to segment");
-    
-				// Notify MainViewModel of segment changes
-				if (viewModel != null)
-				{
-					viewModel.WaveformSegments = Segments.ToList();
-				}
+                UpdateDisplay();
+                UpdateSegmentInfo($"Applied voice '{newVoiceName}' to segment {segmentIndex + 1}");
+                
+                if (viewModel != null)
+                {
+                    viewModel.WaveformSegments = Segments.ToList();
+                }
             }
             
             SegmentEditorPopup.IsOpen = false;
@@ -606,7 +587,7 @@ namespace TTS1.WPF.Controls
                 var markerToDelete = Markers.FirstOrDefault(m => 
                     Math.Abs(m.TimeSeconds - currentEditingSegment.StartTime) < 0.01);
                 
-                if (markerToDelete != null && Markers.Count > 2) // Keep at least 2 markers
+                if (markerToDelete != null && Markers.Count > 2)
                 {
                     Markers.Remove(markerToDelete);
                     UpdateSegmentInfo($"Marker deleted");
@@ -615,137 +596,188 @@ namespace TTS1.WPF.Controls
             
             SegmentEditorPopup.IsOpen = false;
         }
-		// Add a public method to play the selected segment (called from MainWindow)
-		
-		public async Task PlaySelectedSegmentAsync()
-		{
-			if (selectedSegment == null)
-			{
-				UpdateSegmentInfo("No segment selected - click a segment first");
-				return;
-			}
-			
-			if (viewModel == null)
-			{
-				UpdateSegmentInfo("View model not initialized");
-				return;
-			}
-			
-			// Extract the text for this segment from the main input
-			string fullText = viewModel.InputText;
-			if (string.IsNullOrEmpty(fullText))
-			{
-				UpdateSegmentInfo("No text to play");
-				return;
-			}
-			
-			// Split the text by <split> tags
-			var parts = System.Text.RegularExpressions.Regex.Split(fullText, @"<\s*split\s*/?\s*>");
-			
-			// Find which part corresponds to this segment based on its index
-			int segmentIndex = Segments.ToList().IndexOf(selectedSegment);
-			if (segmentIndex >= 0 && segmentIndex < parts.Length)
-			{
-				string segmentText = parts[segmentIndex].Trim();
-				
-				if (!string.IsNullOrEmpty(segmentText))
-				{
-					// Store original voice
-					string originalVoice = viewModel.SelectedVoice;
-					
-					// Create settings from the segment
-					var settings = selectedSegment.Settings ?? new SSMLSettings();
-					
-					// Play the segment text
-					UpdateSegmentInfo($"Playing segment {segmentIndex + 1}...");
-					
-					try
-					{
-						var provider = viewModel.GetCurrentProvider();
-						if (provider != null)
-						{
-							// Set voice for this segment
-							provider.SetVoice(selectedSegment.VoiceName);
-							
-							// Play the segment
-							await provider.SpeakAsync(segmentText, settings);
-							
-							// Restore original voice
-							viewModel.SelectedVoice = originalVoice;
-							UpdateSegmentInfo($"Playback complete - segment {segmentIndex + 1}");
-						}
-					}
-					catch (Exception ex)
-					{
-						MessageBox.Show($"Error playing segment: {ex.Message}", "Playback Error", 
-							MessageBoxButton.OK, MessageBoxImage.Warning);
-						UpdateSegmentInfo("Playback error");
-						
-						// Restore original voice even on error
-						viewModel.SelectedVoice = originalVoice;
-					}
-				}
-				else
-				{
-					UpdateSegmentInfo("Segment has no text");
-				}
-			}
-			else
-			{
-				UpdateSegmentInfo("Could not find segment text");
-			}
-		}
 
-		private async void PlaySegment_Click(object sender, RoutedEventArgs e)
-		{
-			if (currentEditingSegment != null && viewModel != null)
-			{
-				// Close popup first
-				SegmentEditorPopup.IsOpen = false;
-				
-				// Temporarily select this segment for playback
-				selectedSegment = currentEditingSegment;
-				
-				// Play it
-				await PlaySelectedSegmentAsync();
-				
-				// Keep the segment selected after playback
-				// Re-highlight it visually
-				if (segmentRectangles.TryGetValue(selectedSegment, out Rectangle rect))
-				{
-					selectedSegmentRectangle = rect;
-					selectedSegmentRectangle.Opacity = 0.6;
-				}
-			}
-		}
+        // Play selected segment
+        public async Task<bool> PlaySelectedSegmentAsync()
+        {
+            if (selectedSegment == null || string.IsNullOrWhiteSpace(selectedSegment.Text))
+            {
+                if (viewModel != null)
+                {
+                    viewModel.StatusText = "No text in selected segment";
+                }
+                return false;
+            }
+
+            if (viewModel != null)
+            {
+                var provider = viewModel.GetCurrentProvider();
+                if (provider != null)
+                {
+                    // Apply voice settings for this segment
+                    if (!string.IsNullOrEmpty(selectedSegment.VoiceName))
+                    {
+                        provider.SetVoice(selectedSegment.VoiceName);
+                    }
+                    
+                    // Start visual playback
+                    int segmentIndex = Segments.IndexOf(selectedSegment);
+                    StartSegmentPlayback(segmentIndex);
+                    
+                    // Speak the text
+                    bool success = await provider.SpeakAsync(
+                        selectedSegment.Text, 
+                        selectedSegment.Settings ?? new SSMLSettings()
+                    );
+                    
+                    // Stop visual playback
+                    StopPlayback();
+                    
+                    return success;
+                }
+            }
+            
+            return false;
+        }
+
+        private async void PlaySegment_Click(object sender, RoutedEventArgs e)
+        {
+            if (currentEditingSegment != null)
+            {
+                SegmentEditorPopup.IsOpen = false;
+                selectedSegment = currentEditingSegment;
+                await PlaySelectedSegmentAsync();
+            }
+        }
 
         private void CancelSegmentEdit_Click(object sender, RoutedEventArgs e)
         {
             SegmentEditorPopup.IsOpen = false;
         }
 
-        // Add this new method to update segment colors when voices change
-        private void RedrawSegmentColors()
+        // Playback visualization methods
+        public void StartSegmentPlayback(int segmentIndex)
         {
-            // Create a voice-to-color mapping
-            var voiceColors = new Dictionary<string, Color>();
-            var distinctVoices = Segments.Select(s => s.VoiceName).Distinct().ToList();
+            if (segmentIndex < 0 || segmentIndex >= Segments.Count) return;
             
-            for (int i = 0; i < distinctVoices.Count; i++)
+            currentPlayingSegmentIndex = segmentIndex;
+            var segment = Segments[segmentIndex];
+            
+            // Highlight the playing segment
+            if (segmentRectangles.TryGetValue(segment, out Rectangle rect))
             {
-                voiceColors[distinctVoices[i]] = segmentColors[i % segmentColors.Length];
+                rect.Tag = rect.Opacity;
+                rect.Opacity = 0.7;
+                rect.Stroke = Brushes.Yellow;
+                rect.StrokeThickness = 3;
             }
             
-            // Update each segment rectangle's color based on its voice
-            foreach (var kvp in segmentRectangles)
+            // Create progress bar if it doesn't exist
+            if (playbackProgressBar == null)
             {
-                var segment = kvp.Key;
-                var rect = kvp.Value;
-                
-                if (voiceColors.TryGetValue(segment.VoiceName, out Color color))
+                playbackProgressBar = new Rectangle
                 {
-                    rect.Fill = new SolidColorBrush(color);
+                    Width = 2,
+                    Fill = Brushes.Red,
+                    Opacity = 0.8,
+                    IsHitTestVisible = false
+                };
+                Canvas.SetZIndex(playbackProgressBar, 100);
+                OverlayCanvas.Children.Add(playbackProgressBar);
+            }
+            
+            // Position progress bar at segment start
+            double width = OverlayCanvas.ActualWidth > 0 ? OverlayCanvas.ActualWidth : 800;
+            double startX = (segment.StartTime / audioDuration) * width;
+            Canvas.SetLeft(playbackProgressBar, startX);
+            Canvas.SetTop(playbackProgressBar, 0);
+            playbackProgressBar.Height = OverlayCanvas.ActualHeight;
+            playbackProgressBar.Visibility = Visibility.Visible;
+            
+            // Start animation timer
+            playbackStartTime = DateTime.Now;
+            playbackPosition = segment.StartTime;
+            
+            if (playbackTimer == null)
+            {
+                playbackTimer = new System.Windows.Threading.DispatcherTimer();
+                playbackTimer.Interval = TimeSpan.FromMilliseconds(50);
+                playbackTimer.Tick += PlaybackTimer_Tick;
+            }
+            
+            playbackTimer.Start();
+        }
+
+        public void StopPlayback()
+        {
+            playbackTimer?.Stop();
+            
+            if (playbackProgressBar != null)
+            {
+                playbackProgressBar.Visibility = Visibility.Collapsed;
+            }
+            
+            if (currentPlayingSegmentIndex >= 0 && currentPlayingSegmentIndex < Segments.Count)
+            {
+                var segment = Segments[currentPlayingSegmentIndex];
+                if (segmentRectangles.TryGetValue(segment, out Rectangle rect))
+                {
+                    if (rect.Tag is double originalOpacity)
+                    {
+                        rect.Opacity = originalOpacity;
+                    }
+                    else
+                    {
+                        rect.Opacity = 0.3;
+                    }
+                    rect.Stroke = null;
+                    rect.StrokeThickness = 0;
                 }
+            }
+            
+            currentPlayingSegmentIndex = -1;
+        }
+
+        private void PlaybackTimer_Tick(object sender, EventArgs e)
+        {
+            if (currentPlayingSegmentIndex < 0 || currentPlayingSegmentIndex >= Segments.Count)
+            {
+                StopPlayback();
+                return;
+            }
+            
+            var segment = Segments[currentPlayingSegmentIndex];
+            var elapsed = DateTime.Now - playbackStartTime;
+            
+            playbackPosition = segment.StartTime + elapsed.TotalSeconds;
+            
+            if (!ignoreSegmentEndDuringPlayback && playbackPosition > segment.EndTime)
+            {
+                StopPlayback();
+                return;
+            }
+            
+            double width = OverlayCanvas.ActualWidth > 0 ? OverlayCanvas.ActualWidth : 800;
+            double x = (playbackPosition / audioDuration) * width;
+            Canvas.SetLeft(playbackProgressBar, x);
+        }
+
+        public void StartMultiSegmentPlayback()
+        {
+            currentPlayingSegmentIndex = 0;
+            if (Segments.Count > 0)
+            {
+                StartSegmentPlayback(0);
+            }
+        }
+
+        public void AdvanceToNextSegment()
+        {
+            StopPlayback();
+            currentPlayingSegmentIndex++;
+            if (currentPlayingSegmentIndex < Segments.Count)
+            {
+                StartSegmentPlayback(currentPlayingSegmentIndex);
             }
         }
 
@@ -764,7 +796,6 @@ namespace TTS1.WPF.Controls
 
         private void UpdateSegmentInfo(string info)
         {
-            // Find the SegmentInfoText in the main window
             var mainWindow = Window.GetWindow(this) as MainWindow;
             if (mainWindow != null)
             {
@@ -776,7 +807,6 @@ namespace TTS1.WPF.Controls
             }
         }
 
-        // Handle resizing
         protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
         {
             base.OnRenderSizeChanged(sizeInfo);

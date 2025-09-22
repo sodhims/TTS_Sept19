@@ -1,7 +1,7 @@
+# root and any nested projects
 bin/
 obj/
+**/bin/
+**/obj/
 .vs/
-*.user
-*.suo
-.idea/
 .vscode/

@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="TTS Multi-Provider with Split Support" 
+        Title="SpeechCraft - Multi-Voice Text-to-Speech Studio" 
         Height="750" Width="1050"
         WindowStartupLocation="CenterScreen">
     
@@ -27,17 +27,74 @@
             <Setter Property="Padding" Value="10,5"/>
             <Setter Property="FontWeight" Value="Bold"/>
         </Style>
+        
+        <!-- Embossed Button Style for Toolbar -->
+        <Style x:Key="EmbossedButtonStyle" TargetType="Button">
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background">
+                <Setter.Value>
+                    <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                        <GradientStop Color="#FFF3F3F3" Offset="0"/>
+                        <GradientStop Color="#EBEBEB" Offset="0.5"/>
+                        <GradientStop Color="#DDDDDD" Offset="0.5"/>
+                        <GradientStop Color="#CDCDCD" Offset="1"/>
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="BorderBrush" Value="#888"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" 
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="3">
+                            <Border.Effect>
+                                <DropShadowEffect ShadowDepth="1" Direction="315" Color="Gray" Opacity="0.5" BlurRadius="2"/>
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect ShadowDepth="0" Direction="315" Color="Gray" Opacity="0.3" BlurRadius="1"/>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <TranslateTransform X="1" Y="1"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                                            <GradientStop Color="#FFF9F9F9" Offset="0"/>
+                                            <GradientStop Color="#F1F1F1" Offset="0.5"/>
+                                            <GradientStop Color="#E3E3E3" Offset="0.5"/>
+                                            <GradientStop Color="#D3D3D3" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <DockPanel LastChildFill="True">
-        <ToolBar x:Name="MainToolBar" DockPanel.Dock="Top">
-            <!-- Add toolbar buttons here -->
-            <Button Content="Open" Click="MenuOpenFile_Click"/>
-            <Button Content="Save" Click="MenuSaveText_Click"/>
-            <Separator/>
-        </ToolBar>
-        
-        <!-- Menu Bar -->
+        <!-- Menu Bar - Always visible at top -->
         <Menu DockPanel.Dock="Top">
             <!-- File Menu -->
             <MenuItem Header="_File">
@@ -72,15 +129,23 @@
             <!-- Voice Menu -->
             <MenuItem Header="_Voice">
                 <MenuItem Header="_Provider">
-                    <MenuItem Header="Windows SAPI" IsCheckable="True" Click="MenuWindowsProvider_Click"/>
-                    <MenuItem Header="Google Cloud TTS" IsCheckable="True" Click="MenuGoogleProvider_Click"/>
+                    <MenuItem x:Name="MenuWindowsProvider" 
+                              Header="Windows SAPI" 
+                              IsCheckable="True" 
+                              IsChecked="True"
+                              Click="MenuWindowsProvider_Click"/>
+                    <MenuItem x:Name="MenuGoogleProvider" 
+                              Header="Google Cloud TTS" 
+                              IsCheckable="True" 
+                              Click="MenuGoogleProvider_Click"/>
                 </MenuItem>
                 <Separator/>
                 <MenuItem x:Name="MenuSelectVoice" Header="_Select Voice">
                     <!-- Populated dynamically -->
                 </MenuItem>
+                <Separator/>
                 <MenuItem Header="_Test Voice" Click="btnTestVoice_Click"/>
-				<MenuItem Header="_Stop Voice" Click="StopVoice_Click"/>
+                <MenuItem Header="_Stop Play" Click="StopPlay_Click"/>
             </MenuItem>
 
             <!-- Playback Menu -->
@@ -92,15 +157,124 @@
 
             <!-- Help Menu -->
             <MenuItem Header="_Help">
-                <MenuItem Header="View _Help" Click="MenuHelp_Click"/>
-                <MenuItem Header="_About" Click="MenuAbout_Click"/>
+                <MenuItem Header="_Getting Started" Click="MenuGettingStarted_Click">
+                    <MenuItem.Icon>
+                        <TextBlock Text="🚀" FontSize="16"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_User Guide" Click="MenuUserGuide_Click">
+                    <MenuItem.Icon>
+                        <TextBlock Text="📖" FontSize="16"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <Separator/>
+                <MenuItem Header="_Keyboard Shortcuts" Click="MenuKeyboardShortcuts_Click" InputGestureText="F1">
+                    <MenuItem.Icon>
+                        <TextBlock Text="⌨" FontSize="16"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <Separator/>
+                <MenuItem Header="Google Cloud _Setup" Click="MenuGoogleSetup_Click">
+                    <MenuItem.Icon>
+                        <TextBlock Text="☁" FontSize="16"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="SSML _Reference" Click="MenuSSMLReference_Click">
+                    <MenuItem.Icon>
+                        <TextBlock Text="📝" FontSize="16"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <Separator/>
+                <MenuItem Header="_Report Issue" Click="MenuReportIssue_Click">
+                    <MenuItem.Icon>
+                        <TextBlock Text="🐛" FontSize="16"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_Check for Updates" Click="MenuCheckUpdates_Click">
+                    <MenuItem.Icon>
+                        <TextBlock Text="🔄" FontSize="16"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <Separator/>
+                <MenuItem Header="_About SpeechCraft" Click="MenuAbout_Click">
+                    <MenuItem.Icon>
+                        <TextBlock Text="ℹ" FontSize="16"/>
+                    </MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
         </Menu>
+        
+        <!-- Toolbar - Below menu bar -->
+        <ToolBar x:Name="MainToolBar" DockPanel.Dock="Top" ToolBarTray.IsLocked="True">
+            <ToolBar.Resources>
+                <Style TargetType="Button" BasedOn="{StaticResource EmbossedButtonStyle}"/>
+            </ToolBar.Resources>
+            
+            <Button Content="Open" Click="MenuOpenFile_Click" ToolTip="Open text file"/>
+            <Separator/>
+            <Button Content="Save" Click="MenuSaveText_Click" ToolTip="Save text"/>
+            <Separator/>
+            <Label Content="Voice:" VerticalAlignment="Center"/>
+            <ComboBox x:Name="ToolbarVoiceCombo" 
+                      Width="200" 
+                      ItemsSource="{Binding AvailableVoices}"
+                      SelectedItem="{Binding SelectedVoice}"
+                      ToolTip="Select voice"/>
+            <Button Content="Test Voice" Click="btnTestVoice_Click" ToolTip="Test selected voice"/>
+            <Separator/>
+            <Button Content="Speak All" Click="btnSpeakAll_Click" ToolTip="Speak all text"/>
+            <Separator/>
+            <Button x:Name="btnToolbarStopPlay" 
+                    Content="Stop Play" 
+                    Click="StopPlay_Click" 
+                    ToolTip="Stop all playback"
+                    IsEnabled="False">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource EmbossedButtonStyle}">
+                        <Style.Triggers>
+                            <Trigger Property="IsEnabled" Value="True">
+                                <Setter Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                                            <GradientStop Color="#FFCB6B" Offset="0"/>
+                                            <GradientStop Color="#CD5C5C" Offset="0.5"/>
+                                            <GradientStop Color="#B94848" Offset="0.5"/>
+                                            <GradientStop Color="#A52A2A" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Separator/>
+            <Separator/>
+            <Button x:Name="btnExit" 
+                    Content="Exit" 
+                    Click="MenuExit_Click" 
+                    ToolTip="Exit SpeechCraft (Alt+F4)"
+                    HorizontalAlignment="Right">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource EmbossedButtonStyle}">
+                        <Setter Property="Background">
+                            <Setter.Value>
+                                <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                                    <GradientStop Color="#FFB6B6" Offset="0"/>
+                                    <GradientStop Color="#FFA0A0" Offset="0.5"/>
+                                    <GradientStop Color="#FF9090" Offset="0.5"/>
+                                    <GradientStop Color="#FF7878" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </ToolBar>
 
         <!-- Main Content Grid -->
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -109,104 +283,59 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Provider Selection Panel -->
-            <GroupBox Grid.Row="0" Header="TTS Provider Configuration" Style="{StaticResource GroupBoxStyle}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="200"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="250"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Provider Selection -->
-                    <Label Grid.Row="0" Grid.Column="0" Content="TTS Provider:" Style="{StaticResource LabelStyle}"/>
-                    <ComboBox Grid.Row="0" Grid.Column="1" 
-                              Name="cboProvider" 
-                              Margin="5"
-                              SelectedIndex="{Binding SelectedProviderIndex, Mode=TwoWay}">
-                        <ComboBoxItem>Windows SAPI</ComboBoxItem>
-                        <ComboBoxItem>Google Cloud TTS</ComboBoxItem>
-                    </ComboBox>
-
-                    <Label Grid.Row="0" Grid.Column="2" Content="Google API Key:" Style="{StaticResource LabelStyle}"/>
-                    <PasswordBox Grid.Row="0" Grid.Column="3" 
-                                Name="txtApiKey" 
-                                Margin="5"
-                                IsEnabled="{Binding IsGoogleProviderSelected}"
-                                PasswordChanged="txtApiKey_PasswordChanged"/>
-
-                    <!-- Voice Selection -->
-                    <Label Grid.Row="1" Grid.Column="0" Content="Voice:" Style="{StaticResource LabelStyle}"/>
-                    <ComboBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
-                              Name="cboVoice" 
-                              Margin="5"
-                              ItemsSource="{Binding AvailableVoices}"
-                              SelectedItem="{Binding SelectedVoice, Mode=TwoWay}"/>
-                    
-                    <Button Grid.Row="1" Grid.Column="3" 
-                            x:Name="btnTestVoice"
-                            Content="Test Voice" 
-                            Margin="5"
-                            Click="btnTestVoice_Click"/>
-                </Grid>
-            </GroupBox>
-
             <!-- Prosody and Emphasis Controls -->
-            <GroupBox Grid.Row="1" Header="Prosody and Emphasis" Style="{StaticResource GroupBoxStyle}">
+            <GroupBox Grid.Row="0" Header="Voice Settings" Style="{StaticResource GroupBoxStyle}">
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="200"/>
-                        <ColumnDefinition Width="50"/>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="200"/>
-                        <ColumnDefinition Width="50"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Rate Control -->
-                    <Label Grid.Row="0" Grid.Column="0" Content="Rate (%):" Style="{StaticResource LabelStyle}"/>
-                    <Slider Grid.Row="0" Grid.Column="1" 
+                    <Label Grid.Column="0" Content="Rate (%):" VerticalAlignment="Center" Margin="5,0"/>
+                    <Slider Grid.Column="1" 
                             Name="trkRate"
                             Minimum="-50" Maximum="50" 
                             Value="{Binding RatePercent, Mode=TwoWay}"
                             TickFrequency="10" 
                             IsSnapToTickEnabled="True"
+                            VerticalAlignment="Center"
                             Margin="5"/>
-                    <TextBlock Grid.Row="0" Grid.Column="2" 
+                    <TextBlock Grid.Column="2" 
                               Text="{Binding ElementName=trkRate, Path=Value, StringFormat={}{0:0}}"
                               VerticalAlignment="Center"
                               HorizontalAlignment="Center"/>
 
                     <!-- Pitch Control -->
-                    <Label Grid.Row="0" Grid.Column="3" Content="Pitch (st):" Style="{StaticResource LabelStyle}"/>
-                    <Slider Grid.Row="0" Grid.Column="4" 
+                    <Label Grid.Column="3" Content="Pitch (st):" VerticalAlignment="Center" Margin="5,0"/>
+                    <Slider Grid.Column="4" 
                             Name="trkPitch"
                             Minimum="-12" Maximum="12" 
                             Value="{Binding PitchSemitones, Mode=TwoWay}"
                             TickFrequency="2" 
                             IsSnapToTickEnabled="True"
+                            VerticalAlignment="Center"
                             Margin="5"/>
-                    <TextBlock Grid.Row="0" Grid.Column="5" 
+                    <TextBlock Grid.Column="5" 
                               Text="{Binding ElementName=trkPitch, Path=Value, StringFormat={}{0:0}}"
                               VerticalAlignment="Center"
                               HorizontalAlignment="Center"/>
 
-                    <!-- Volume Control -->
-                    <Label Grid.Row="1" Grid.Column="0" Content="Volume:" Style="{StaticResource LabelStyle}"/>
-                    <ComboBox Grid.Row="1" Grid.Column="1" 
+                    <!-- Volume -->
+                    <Label Grid.Column="6" Content="Volume:" VerticalAlignment="Center" Margin="5,0"/>
+                    <ComboBox Grid.Column="7" 
                               Name="cboVolume"
+                              VerticalAlignment="Center"
                               Margin="5"
                               SelectedValue="{Binding VolumeLevel, Mode=TwoWay}"
                               SelectedValuePath="Content">
@@ -218,34 +347,57 @@
                         <ComboBoxItem Content="x-loud"/>
                     </ComboBox>
 
-                    <!-- Use SSML Checkbox -->
-                    <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
-                              Content="Use SSML (recommended)"
-                              IsChecked="{Binding UseSSML, Mode=TwoWay}"
+                    <!-- Emphasis -->
+                    <Label Grid.Column="8" Content="Emphasis:" VerticalAlignment="Center" Margin="5,0"/>
+                    <ComboBox Grid.Column="9" 
+                              Name="cboEmphasis"
+                              VerticalAlignment="Center"
                               Margin="5"
+                              SelectedValue="{Binding EmphasisLevel, Mode=TwoWay}"
+                              SelectedValuePath="Content">
+                        <ComboBoxItem Content="none" IsSelected="True"/>
+                        <ComboBoxItem Content="reduced"/>
+                        <ComboBoxItem Content="moderate"/>
+                        <ComboBoxItem Content="strong"/>
+                    </ComboBox>
+
+                    <!-- Use SSML Checkbox -->
+                    <CheckBox Grid.Column="10"
+                              Content="Use SSML"
+                              IsChecked="{Binding UseSSML, Mode=TwoWay}"
+                              Margin="10,0"
                               VerticalAlignment="Center"/>
+
+                    <!-- Provider Display -->
+                    <TextBlock Grid.Column="11" 
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Right"
+                               Margin="10,0">
+                        <Run Text="Provider: " FontWeight="Normal"/>
+                        <Run Text="{Binding CurrentProviderName}" FontWeight="SemiBold"/>
+                    </TextBlock>
                 </Grid>
             </GroupBox>
 
             <!-- Input Text -->
-            <GroupBox Grid.Row="2" Header="Input Text (use &lt;split&gt; to separate files)" 
+            <GroupBox Grid.Row="1" Header="Input Text (use &lt;split&gt; to separate segments)" 
                       Style="{StaticResource GroupBoxStyle}">
                 <TextBox Name="txtInput"
                          Text="{Binding InputText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          TextWrapping="Wrap"
                          AcceptsReturn="True"
                          VerticalScrollBarVisibility="Visible"
-						 MinLines="10"
-						 MaxLines="10"
-						 FontFamily="Consolas"
-						 FontSize="10"
-						 SpellCheck.IsEnabled="True"
+                         MinLines="10"
+                         MaxLines="10"
+                         FontFamily="Consolas"
+                         FontSize="12"
+                         SpellCheck.IsEnabled="True"
                          Margin="5"
-						 VerticalAlignment="Top" />
+                         VerticalAlignment="Top" />
             </GroupBox>
 
             <!-- SSML Preview -->
-            <GroupBox Grid.Row="3" Header="SSML Preview" Style="{StaticResource GroupBoxStyle}" x:Name="SSMLPreviewGroup">
+            <GroupBox Grid.Row="2" Header="SSML Preview" Style="{StaticResource GroupBoxStyle}" x:Name="SSMLPreviewGroup">
                 <TextBox Name="txtSSMLPreview"
                          Text="{Binding SSMLPreview, Mode=OneWay}"
                          IsReadOnly="True"
@@ -253,72 +405,74 @@
                          VerticalScrollBarVisibility="Auto"
                          Background="#F5F5F5"
                          FontFamily="Consolas"
+                         FontSize="11"
                          Margin="5"/>
             </GroupBox>
 
             <!-- Control Buttons -->
-            <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Margin="10">
+            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="10">
                 <Button x:Name="btnSpeakAll" 
                         Content="Speak All" 
                         Width="120"
                         Margin="5"
-                        Click="btnSpeakAll_Click"/>
+                        Click="btnSpeakAll_Click"
+                        ToolTip="Speak all text with current settings"/>
                 
                 <Button x:Name="btnSaveWav" 
                         Content="Save as WAV" 
                         Width="120"
                         Margin="5"
-                        Click="btnSaveWav_Click"/>
+                        Click="btnSaveWav_Click"
+                        ToolTip="Save audio as WAV file"/>
                 
                 <Button x:Name="btnSaveMp3" 
                         Content="Save as MP3" 
                         Width="120"
                         Margin="5"
-                        Click="btnSaveMp3_Click"/>
+                        Click="btnSaveMp3_Click"
+                        ToolTip="Save audio as MP3 file"/>
                 
                 <Button x:Name="btnSaveSplitWav" 
                         Content="Split to WAVs" 
                         Width="120"
                         Background="LightGreen"
                         Style="{StaticResource SplitButtonStyle}"
-                        Click="btnSaveSplitWav_Click"/>
+                        Click="btnSaveSplitWav_Click"
+                        ToolTip="Split text at &lt;split&gt; tags and save as multiple WAV files"/>
                 
                 <Button x:Name="btnSaveSplitMp3" 
                         Content="Split to MP3s" 
                         Width="120"
                         Background="LightBlue"
                         Style="{StaticResource SplitButtonStyle}"
-                        Click="btnSaveSplitMp3_Click"/>
-				<Button x:Name="btnStopVoice" 
-						Content="Stop Voice" 
-						Width="120"
-						Margin="5"
-						IsEnabled="False"/>
-				
-				<Button x:Name="btnStopAll" 
-						Content="Stop All" 
-						Width="120"
-						Margin="5"
-						IsEnabled="False"
-						Visibility="Collapsed"/>
-				
-				<Button x:Name="btnStopMultiVoice" 
-						Content="Stop Multi" 
-						Width="120"
-						Margin="5"
-						IsEnabled="False"
-						Visibility="Collapsed"/>
+                        Click="btnSaveSplitMp3_Click"
+                        ToolTip="Split text at &lt;split&gt; tags and save as multiple MP3 files"/>
+                
+                <Button x:Name="btnStopPlay" 
+                        Content="Stop Play" 
+                        Width="120"
+                        Margin="5"
+                        Click="StopPlay_Click"
+                        IsEnabled="False"
+                        Background="LightGray"
+                        ToolTip="Stop all playback"/>
             </StackPanel>
 
             <!-- Status Bar -->
-            <StatusBar Grid.Row="5" x:Name="statusBar">
+            <StatusBar Grid.Row="4" x:Name="statusBar">
                 <StatusBarItem>
                     <TextBlock Name="statusLabel" Text="{Binding StatusText}"/>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Right">
+                    <TextBlock Name="providerLabel" 
+                               Text="{Binding CurrentProviderName}" 
+                               FontWeight="SemiBold"
+                               Margin="0,0,10,0"/>
                 </StatusBarItem>
             </StatusBar>
             
             <!-- Waveform Editor Panel -->
-            <GroupBox Grid.Row="6" Header="Audio Waveform Editor" Style="{StaticResource GroupBoxStyle}" x:Name="WaveformGroup">
+            <GroupBox Grid.Row="5" Header="Audio Waveform Editor" Style="{StaticResource GroupBoxStyle}" x:Name="WaveformGroup">
                 <Grid Height="300">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="35"/>
@@ -328,11 +482,20 @@
                     
                     <!-- Waveform Toolbar -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5">
+                        <Button x:Name="btnProcessVoiceTags" 
+                                Content="Process Voice Tags" 
+                                Click="btnProcessVoiceTags_Click" 
+                                Margin="2" 
+                                Padding="5,2"
+                                Background="LightYellow"
+                                ToolTip="Convert &lt;voice=1&gt; tags to segments"/>
+                        <Separator Width="5"/>
                         <Button x:Name="btnGenerateWaveform" 
                                 Content="Generate Audio Preview" 
                                 Click="btnGenerateWaveform_Click" 
                                 Margin="2" 
-                                Padding="5,2"/>
+                                Padding="5,2"
+                                ToolTip="Generate waveform preview from input text"/>
                         <Separator Width="10"/>
                         <Label Content="Ctrl+Click: Add marker | Click: Select | Right-Click: Edit" 
                                VerticalAlignment="Center"/>
@@ -341,12 +504,14 @@
                                 Content="▶ Play Selected" 
                                 Click="btnPlaySegment_Click" 
                                 Margin="2" 
-                                Padding="5,2"/>
+                                Padding="5,2"
+                                ToolTip="Play the selected segment"/>
                         <Button x:Name="btnClearMarkers" 
                                 Content="Clear Markers" 
                                 Click="btnClearMarkers_Click" 
                                 Margin="2" 
-                                Padding="5,2"/>
+                                Padding="5,2"
+                                ToolTip="Clear all markers"/>
                         <Separator Width="10"/>
                         <Button x:Name="btnGenerateMultiVoice" 
                                 Content="Generate Multi-Voice Audio" 
@@ -354,7 +519,8 @@
                                 Background="LightGreen" 
                                 FontWeight="Bold"
                                 Margin="2" 
-                                Padding="10,2"/>
+                                Padding="10,2"
+                                ToolTip="Generate audio with different voices for each segment"/>
                     </StackPanel>
                     
                     <!-- Waveform Display -->
